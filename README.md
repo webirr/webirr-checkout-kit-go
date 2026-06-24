@@ -115,28 +115,33 @@ Keep merchant credentials on the server side. The checkout kit receives a
 gateway client, so TestEnv versus ProdEnv is selected when the merchant app
 constructs the official Go SDK client.
 
-For runnable examples, use `WEBIRR_CHECKOUT_MODE`:
+Use the same simple shape as the Moodle plugin: merchant ID, API key, and a
+test-mode indicator.
 
-| Mode | Purpose | Required credentials |
-| --- | --- | --- |
-| `mock` | Local UI/dev checks with no WeBirr credentials. This is the example default. | none |
-| `testenv` | Real WeBirr TestEnv bill/payment-code creation. | `WEBIRR_TEST_ENV_MERCHANT_ID`, `WEBIRR_TEST_ENV_API_KEY` |
-| `prod` | Merchant production deployment. | `WEBIRR_PROD_MERCHANT_ID`, `WEBIRR_PROD_API_KEY` |
+| Setting | Purpose |
+| --- | --- |
+| `WEBIRR_MERCHANT_ID` | WeBirr merchant ID for the selected environment. |
+| `WEBIRR_API_KEY` | WeBirr API key for the selected environment. |
+| `WEBIRR_TEST_MODE` | `true` for TestEnv, `false` for ProdEnv. Defaults to `true` in the runnable example. |
+
+The runnable example uses mock mode only when both credential variables are
+omitted. Mock mode is for local UI checks and CI-style verification without
+WeBirr credentials.
 
 Example TestEnv configuration:
 
 ```bash
-export WEBIRR_CHECKOUT_MODE=testenv
-export WEBIRR_TEST_ENV_MERCHANT_ID=your-test-merchant-id
-export WEBIRR_TEST_ENV_API_KEY=your-test-env-api-key
+export WEBIRR_MERCHANT_ID=your-test-merchant-id
+export WEBIRR_API_KEY=your-test-env-api-key
+export WEBIRR_TEST_MODE=true
 ```
 
 Example ProdEnv configuration:
 
 ```bash
-export WEBIRR_CHECKOUT_MODE=prod
-export WEBIRR_PROD_MERCHANT_ID=your-production-merchant-id
-export WEBIRR_PROD_API_KEY=your-production-api-key
+export WEBIRR_MERCHANT_ID=your-production-merchant-id
+export WEBIRR_API_KEY=your-production-api-key
+export WEBIRR_TEST_MODE=false
 ```
 
 Do not use production credentials for screenshots, local demos, or CI smoke
@@ -157,15 +162,9 @@ import (
 )
 
 func main() {
-	mode := strings.ToLower(strings.TrimSpace(os.Getenv("WEBIRR_CHECKOUT_MODE")))
-	isTestEnv := mode != "prod"
-
-	merchantID := os.Getenv("WEBIRR_TEST_ENV_MERCHANT_ID")
-	apiKey := os.Getenv("WEBIRR_TEST_ENV_API_KEY")
-	if !isTestEnv {
-		merchantID = os.Getenv("WEBIRR_PROD_MERCHANT_ID")
-		apiKey = os.Getenv("WEBIRR_PROD_API_KEY")
-	}
+	isTestEnv := strings.ToLower(strings.TrimSpace(os.Getenv("WEBIRR_TEST_MODE"))) != "false"
+	merchantID := os.Getenv("WEBIRR_MERCHANT_ID")
+	apiKey := os.Getenv("WEBIRR_API_KEY")
 
 	client := webirr.NewClient(merchantID, apiKey, isTestEnv)
 
@@ -346,9 +345,9 @@ fields, and payment status changes through the backend.
 Run it against WeBirr TestEnv:
 
 ```bash
-WEBIRR_CHECKOUT_MODE=testenv \
-WEBIRR_TEST_ENV_MERCHANT_ID=your-test-merchant-id \
-WEBIRR_TEST_ENV_API_KEY=your-test-api-key \
+WEBIRR_MERCHANT_ID=your-test-merchant-id \
+WEBIRR_API_KEY=your-test-api-key \
+WEBIRR_TEST_MODE=true \
 go run ./examples/nethttp-memory
 ```
 
@@ -362,14 +361,11 @@ TestEnv banking app or simulator.
 Run it against WeBirr ProdEnv only from a merchant production deployment:
 
 ```bash
-WEBIRR_CHECKOUT_MODE=prod \
-WEBIRR_PROD_MERCHANT_ID=your-production-merchant-id \
-WEBIRR_PROD_API_KEY=your-production-api-key \
+WEBIRR_MERCHANT_ID=your-production-merchant-id \
+WEBIRR_API_KEY=your-production-api-key \
+WEBIRR_TEST_MODE=false \
 go run ./examples/nethttp-memory
 ```
-
-The legacy alias `WEBIRR_CHECKOUT_MODE=live` is treated as `testenv`. New
-commands should use `testenv` or `prod` explicitly.
 
 ## Run Tests
 

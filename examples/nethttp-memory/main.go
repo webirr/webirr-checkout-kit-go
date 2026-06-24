@@ -72,48 +72,39 @@ func main() {
 }
 
 func createGateway() (string, checkout.GatewayClient, error) {
-	mode := checkoutGatewayMode()
-	switch mode {
-	case "mock":
-		return mode, newMockGateway(), nil
-	case "testenv":
-		merchantID := firstEnv("WEBIRR_TEST_ENV_MERCHANT_ID", "WEBIRR_MERCHANT_ID")
-		apiKey := firstEnv("WEBIRR_TEST_ENV_API_KEY", "WEBIRR_API_KEY")
-		if merchantID == "" || apiKey == "" {
-			return "", nil, errors.New("WeBirr TestEnv mode requires WEBIRR_TEST_ENV_MERCHANT_ID and WEBIRR_TEST_ENV_API_KEY")
-		}
-		return mode, webirr.NewClient(merchantID, apiKey, true), nil
-	case "prod":
-		merchantID := firstEnv("WEBIRR_PROD_MERCHANT_ID", "WEBIRR_MERCHANT_ID")
-		apiKey := firstEnv("WEBIRR_PROD_API_KEY", "WEBIRR_API_KEY")
-		if merchantID == "" || apiKey == "" {
-			return "", nil, errors.New("WeBirr ProdEnv mode requires WEBIRR_PROD_MERCHANT_ID and WEBIRR_PROD_API_KEY")
-		}
-		return mode, webirr.NewClient(merchantID, apiKey, false), nil
+	merchantID := strings.TrimSpace(os.Getenv("WEBIRR_MERCHANT_ID"))
+	apiKey := strings.TrimSpace(os.Getenv("WEBIRR_API_KEY"))
+	if merchantID == "" && apiKey == "" {
+		return "mock", newMockGateway(), nil
+	}
+	if merchantID == "" || apiKey == "" {
+		return "", nil, errors.New("real WeBirr gateway mode requires WEBIRR_MERCHANT_ID and WEBIRR_API_KEY")
+	}
+
+	isTestEnv, err := envBoolDefault("WEBIRR_TEST_MODE", true)
+	if err != nil {
+		return "", nil, err
+	}
+	mode := "testenv"
+	if !isTestEnv {
+		mode = "prod"
+	}
+	return mode, webirr.NewClient(merchantID, apiKey, isTestEnv), nil
+}
+
+func envBoolDefault(name string, defaultValue bool) (bool, error) {
+	value := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	if value == "" {
+		return defaultValue, nil
+	}
+	switch value {
+	case "1", "true", "yes", "y", "on":
+		return true, nil
+	case "0", "false", "no", "n", "off":
+		return false, nil
 	default:
-		return "", nil, errors.New("WEBIRR_CHECKOUT_MODE must be one of: mock, testenv, prod")
+		return false, errors.New(name + " must be true or false")
 	}
-}
-
-func checkoutGatewayMode() string {
-	mode := strings.ToLower(strings.TrimSpace(os.Getenv("WEBIRR_CHECKOUT_MODE")))
-	if mode == "" {
-		return "mock"
-	}
-	if mode == "live" {
-		return "testenv"
-	}
-	return mode
-}
-
-func firstEnv(names ...string) string {
-	for _, name := range names {
-		value := strings.TrimSpace(os.Getenv(name))
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 type demoOrder struct {

@@ -3,8 +3,7 @@
 ![WeBirr Go checkout flow](examples/nethttp-memory/screenshots/go-checkout-journey.png)
 
 Go backend helpers for WeBirr online checkout integrations. This package gives
-custom Go merchant applications the same WeBirr online checkout pattern used by
-the Moodle, WooCommerce, and JavaScript checkout-kit examples: the merchant
+custom Go merchant applications a server-side checkout pattern: the merchant
 backend creates or resumes the WeBirr bill, the browser displays the WeBirr
 Payment Code, the browser polls only merchant-owned endpoints, and the merchant
 backend completes the payable after server-side verification.
@@ -20,7 +19,7 @@ go get github.com/webirr/webirr-checkout-kit-go
 | Area | Path | Status |
 | --- | --- | --- |
 | Go checkout kit | repository root | Public package source for merchant-owned checkout endpoints. |
-| `net/http` example | `examples/nethttp-memory` | Runnable local checkout demo with mock mode by default and optional WeBirr TestEnv mode. |
+| `net/http` example | `examples/nethttp-memory` | Runnable Go merchant checkout example with mock mode by default and optional WeBirr TestEnv mode. |
 | Unit tests | `checkout_test.go` | Tests for bill creation/recovery/update, status resolver modes, HTTP handlers, supported-bank instructions, and local completion. |
 
 ## What Is A Payable?
@@ -28,8 +27,8 @@ go get github.com/webirr/webirr-checkout-kit-go
 In this package, a `Payable` is the merchant-side record being paid. Depending on
 the merchant application, it can be:
 
-- a WooCommerce-style order;
-- a Moodle paid enrollment;
+- an ecommerce order;
+- a paid enrollment;
 - a utility invoice;
 - a customer bill;
 - a booking, subscription, or service charge;
@@ -66,12 +65,36 @@ go get github.com/webirr/webirr-api-go-client
 
 ## Configure
 
-Keep merchant credentials on the server side:
+Keep merchant credentials on the server side. The checkout kit receives a
+gateway client, so TestEnv versus ProdEnv is selected when the merchant app
+constructs the official Go SDK client.
+
+For runnable examples, use `WEBIRR_CHECKOUT_MODE`:
+
+| Mode | Purpose | Required credentials |
+| --- | --- | --- |
+| `mock` | Local UI/dev checks with no WeBirr credentials. This is the example default. | none |
+| `testenv` | Real WeBirr TestEnv bill/payment-code creation. | `WEBIRR_TEST_ENV_MERCHANT_ID`, `WEBIRR_TEST_ENV_API_KEY` |
+| `prod` | Merchant production deployment. | `WEBIRR_PROD_MERCHANT_ID`, `WEBIRR_PROD_API_KEY` |
+
+Example TestEnv configuration:
 
 ```bash
+export WEBIRR_CHECKOUT_MODE=testenv
 export WEBIRR_TEST_ENV_MERCHANT_ID=your-test-merchant-id
 export WEBIRR_TEST_ENV_API_KEY=your-test-env-api-key
 ```
+
+Example ProdEnv configuration:
+
+```bash
+export WEBIRR_CHECKOUT_MODE=prod
+export WEBIRR_PROD_MERCHANT_ID=your-production-merchant-id
+export WEBIRR_PROD_API_KEY=your-production-api-key
+```
+
+Do not use production credentials for screenshots, local demos, or CI smoke
+checks. Use mock mode or TestEnv mode for those cases.
 
 ## Basic Usage
 
@@ -81,17 +104,24 @@ package main
 import (
 	"net/http"
 	"os"
+	"strings"
 
 	checkout "github.com/webirr/webirr-checkout-kit-go"
 	webirr "github.com/webirr/webirr-api-go-client"
 )
 
 func main() {
-	client := webirr.NewClient(
-		os.Getenv("WEBIRR_TEST_ENV_MERCHANT_ID"),
-		os.Getenv("WEBIRR_TEST_ENV_API_KEY"),
-		true,
-	)
+	mode := strings.ToLower(strings.TrimSpace(os.Getenv("WEBIRR_CHECKOUT_MODE")))
+	isTestEnv := mode != "prod"
+
+	merchantID := os.Getenv("WEBIRR_TEST_ENV_MERCHANT_ID")
+	apiKey := os.Getenv("WEBIRR_TEST_ENV_API_KEY")
+	if !isTestEnv {
+		merchantID = os.Getenv("WEBIRR_PROD_MERCHANT_ID")
+		apiKey = os.Getenv("WEBIRR_PROD_API_KEY")
+	}
+
+	client := webirr.NewClient(merchantID, apiKey, isTestEnv)
 
 	store := checkout.NewMemoryStore()
 	store.PutPayable(checkout.Payable{
@@ -251,38 +281,62 @@ Telebirr -> WeBirr -> Payment Code
 Do not show a broad static bank list if the merchant's supported banks could not
 be loaded.
 
-## Screenshots
+## Example App
 
-The `net/http` example screenshots show the same three-step online checkout flow
-used by the Moodle, WooCommerce, and JavaScript checkout-kit examples.
+`examples/nethttp-memory` is a runnable Go merchant checkout example. It models
+a small merchant app with an order page, checkout page, merchant-owned WeBirr
+endpoints, and a success URL.
 
-![Go checkout review](examples/nethttp-memory/screenshots/go-checkout-01-review.png)
+| Route | Purpose |
+| --- | --- |
+| `/orders/{merchantReference}` | Merchant order review page. |
+| `/checkout?merchantReference=...` | Browser checkout page that displays the WeBirr Payment Code. |
+| `/webirr/checkout` | Merchant-owned create/resume endpoint backed by the kit. |
+| `/webirr/checkout/status?merchantReference=...` | Merchant-owned status endpoint backed by the kit. |
+| `/orders/{merchantReference}/success` | Merchant success URL after local payment completion. |
 
-![Go payment code waiting](examples/nethttp-memory/screenshots/go-checkout-02-payment-code.png)
+The example uses an in-memory store to stay small. A production merchant app
+would implement `checkout.Store` with its own order, invoice, enrollment, or bill
+database.
 
-![Go payment confirmed](examples/nethttp-memory/screenshots/go-checkout-03-confirmed.png)
-
-## Local Example
-
-Run the example in mock mode:
+Run it in mock mode:
 
 ```bash
 go run ./examples/nethttp-memory
 ```
 
-Mock mode requires no WeBirr credentials. It preserves the real architecture:
-browser calls merchant-owned endpoints, the backend returns safe checkout fields,
-and payment status changes through the backend.
+Mock mode requires no WeBirr credentials and is useful for UI checks, local
+development, and CI-style verification. It still preserves the real architecture:
+the browser calls merchant-owned endpoints, the backend returns safe checkout
+fields, and payment status changes through the backend.
 
-Run the same example against WeBirr TestEnv:
+Run it against WeBirr TestEnv:
 
 ```bash
+WEBIRR_CHECKOUT_MODE=testenv \
 WEBIRR_TEST_ENV_MERCHANT_ID=your-test-merchant-id \
 WEBIRR_TEST_ENV_API_KEY=your-test-api-key \
 go run ./examples/nethttp-memory
 ```
 
 Then open `http://localhost:8080`.
+
+TestEnv mode creates a real WeBirr TestEnv bill, displays the real WeBirr Payment
+Code format, and loads the merchant-supported bank list from WeBirr. The payment
+will remain pending until the generated payment code is paid through an approved
+TestEnv banking app or simulator.
+
+Run it against WeBirr ProdEnv only from a merchant production deployment:
+
+```bash
+WEBIRR_CHECKOUT_MODE=prod \
+WEBIRR_PROD_MERCHANT_ID=your-production-merchant-id \
+WEBIRR_PROD_API_KEY=your-production-api-key \
+go run ./examples/nethttp-memory
+```
+
+The legacy alias `WEBIRR_CHECKOUT_MODE=live` is treated as `testenv`. New
+commands should use `testenv` or `prod` explicitly.
 
 ## Run Tests
 

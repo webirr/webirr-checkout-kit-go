@@ -56,6 +56,52 @@ idempotently.
 The durable checkout key is `merchantReference`. No browser-facing checkout ID is
 required for the baseline flow.
 
+## Frontend Endpoint Contract
+
+For web frontends and mobile frontends, the merchant app needs only these two
+merchant-owned checkout endpoints. The browser or mobile app must call the
+merchant backend, not the WeBirr merchant API.
+
+| Frontend action | Merchant endpoint | Purpose |
+| --- | --- | --- |
+| Create or resume checkout | `POST /webirr/checkout` | Resolve the merchant payable by `merchantReference`, create or recover the WeBirr bill, save the payment-code mapping, and return safe display fields. |
+| Poll payment status | `GET /webirr/checkout/status?merchantReference=...` | Read payment status through the configured status resolver, complete the local payable when paid, and return safe status fields. |
+
+Create or resume request:
+
+```http
+POST /webirr/checkout
+Content-Type: application/json
+
+{"merchantReference":"ord_2026_06_24_10033"}
+```
+
+Create or resume response includes only display-safe fields such as:
+
+```json
+{
+  "merchantReference": "ord_2026_06_24_10033",
+  "paymentCode": "451 728 230",
+  "amount": "640.00",
+  "currency": "ETB",
+  "customerName": "Elias",
+  "status": "Pending",
+  "supportedBanks": [
+    {"bankID": "cbe_mobile", "name": "CBE Mobile"}
+  ]
+}
+```
+
+Status request:
+
+```http
+GET /webirr/checkout/status?merchantReference=ord_2026_06_24_10033
+```
+
+Paid status responses include `paymentReference` and `paymentIssuer` for the
+confirmation screen. Pending responses should not expose merchant credentials or
+raw gateway payloads.
+
 ## Install
 
 ```bash
@@ -142,19 +188,6 @@ func main() {
 	handler.Register(mux, "/webirr/checkout")
 	http.ListenAndServe(":8080", mux)
 }
-```
-
-The browser or mobile app calls only merchant-owned endpoints:
-
-```http
-POST /webirr/checkout
-Content-Type: application/json
-
-{"merchantReference":"ord_2026_06_24_10033"}
-```
-
-```http
-GET /webirr/checkout/status?merchantReference=ord_2026_06_24_10033
 ```
 
 The browser must not send the amount, API key, merchant ID, or WeBirr endpoint.

@@ -1,4 +1,4 @@
-module github.com/webirr/webirr-checkout-kit-go/examples/nethttp-sqlite
+module github.com/webirr/webirr-checkout-kit-go/examples/checkout-web-app
 
 go 1.22
 

@@ -1,6 +1,6 @@
 # WeBirr Checkout Kit for Go
 
-![WeBirr Go checkout flow](examples/nethttp-sqlite/screenshots/go-checkout-journey.png)
+![WeBirr Go checkout flow](examples/checkout-web-app/screenshots/go-checkout-journey.png)
 
 Go backend helpers for WeBirr online checkout integrations. This package gives
 custom Go merchant applications a server-side checkout pattern: the merchant
@@ -19,7 +19,7 @@ go get github.com/webirr/webirr-checkout-kit-go
 | Area | Path | Status |
 | --- | --- | --- |
 | Go checkout kit | repository root | Public package source for merchant-owned checkout endpoints. |
-| `net/http` + SQLite example | `examples/nethttp-sqlite` | Runnable Go merchant checkout example with SQLite retry/recovery, mock mode by default, and optional WeBirr TestEnv mode. |
+| `net/http` + SQLite example | `examples/checkout-web-app` | Runnable Go merchant checkout example with SQLite retry/recovery, mock mode by default, and optional WeBirr TestEnv mode. |
 | Unit tests | `checkout_test.go` | Tests for bill creation/recovery/update, status resolver modes, HTTP handlers, supported-bank instructions, and local completion. |
 
 ## What Is A Payable?
@@ -169,7 +169,7 @@ func main() {
 	client := webirr.NewClient(merchantID, apiKey, isTestEnv)
 
 	// NewMerchantStore is your database-backed checkout.Store implementation.
-	// See examples/nethttp-sqlite for a complete SQLite version.
+	// See examples/checkout-web-app for a complete SQLite version.
 	store := NewMerchantStore()
 
 	handler := checkout.NewHandler(client, store)
@@ -308,7 +308,7 @@ be loaded.
 
 ## Example App
 
-`examples/nethttp-sqlite` is a runnable Go merchant checkout example. It models
+`examples/checkout-web-app` is a runnable Go merchant checkout example. It models
 a small merchant app with an order page, checkout page, merchant-owned WeBirr
 endpoints, a success URL, and a SQLite store that survives retries and process
 restarts.
@@ -347,7 +347,7 @@ stay in the merchant application's own tables.
 Run it in mock mode:
 
 ```bash
-cd examples/nethttp-sqlite
+cd examples/checkout-web-app
 go run .
 ```
 

@@ -1,6 +1,6 @@
 # WeBirr Checkout Kit for Go
 
-![WeBirr Go checkout flow](examples/nethttp-memory/screenshots/go-checkout-journey.png)
+![WeBirr Go checkout flow](examples/nethttp-sqlite/screenshots/go-checkout-journey.png)
 
 Go backend helpers for WeBirr online checkout integrations. This package gives
 custom Go merchant applications a server-side checkout pattern: the merchant
@@ -19,7 +19,7 @@ go get github.com/webirr/webirr-checkout-kit-go
 | Area | Path | Status |
 | --- | --- | --- |
 | Go checkout kit | repository root | Public package source for merchant-owned checkout endpoints. |
-| `net/http` example | `examples/nethttp-memory` | Runnable Go merchant checkout example with mock mode by default and optional WeBirr TestEnv mode. |
+| `net/http` + SQLite example | `examples/nethttp-sqlite` | Runnable Go merchant checkout example with SQLite retry/recovery, mock mode by default, and optional WeBirr TestEnv mode. |
 | Unit tests | `checkout_test.go` | Tests for bill creation/recovery/update, status resolver modes, HTTP handlers, supported-bank instructions, and local completion. |
 
 ## What Is A Payable?
@@ -168,18 +168,9 @@ func main() {
 
 	client := webirr.NewClient(merchantID, apiKey, isTestEnv)
 
-	store := checkout.NewMemoryStore()
-	store.PutPayable(checkout.Payable{
-		MerchantReference: "ord_2026_06_24_10033",
-		Amount:            "640.00",
-		Currency:          "ETB",
-		CustomerName:      "Elias",
-		CustomerCode:      "CUST-1001",
-		CustomerPhone:     "0911000000",
-		Description:       "Sample Audio Book",
-		SuccessURL:        "/success",
-		CancelURL:         "/cart",
-	})
+	// NewMerchantStore is your database-backed checkout.Store implementation.
+	// See examples/nethttp-sqlite for a complete SQLite version.
+	store := NewMerchantStore()
 
 	handler := checkout.NewHandler(client, store)
 
@@ -214,7 +205,9 @@ Responsibilities:
 - `MarkPaid` completes the order, enrollment, receipt, service delivery, or access
   idempotently after server-side payment confirmation.
 
-`checkout.NewMemoryStore()` is provided only for examples and tests.
+The runnable example uses SQLite to show this store contract with a durable
+`merchantReference -> WeBirr Payment Code` mapping. `checkout.NewMemoryStore()`
+is kept only for package unit tests and small internal test fixtures.
 
 ## Default Payment Status
 
@@ -315,9 +308,10 @@ be loaded.
 
 ## Example App
 
-`examples/nethttp-memory` is a runnable Go merchant checkout example. It models
+`examples/nethttp-sqlite` is a runnable Go merchant checkout example. It models
 a small merchant app with an order page, checkout page, merchant-owned WeBirr
-endpoints, and a success URL.
+endpoints, a success URL, and a SQLite store that survives retries and process
+restarts.
 
 | Route | Purpose |
 | --- | --- |
@@ -327,14 +321,34 @@ endpoints, and a success URL.
 | `/webirr/checkout/status?merchantReference=...` | Merchant-owned status endpoint backed by the kit. |
 | `/orders/{merchantReference}/success` | Merchant success URL after local payment completion. |
 
-The example uses an in-memory store to stay small. A production merchant app
-would implement `checkout.Store` with its own order, invoice, enrollment, or bill
-database.
+The example uses SQLite as the standard local example store. The table keeps the
+checkout-specific state separate from the merchant's full business data:
+
+```text
+id
+merchant_reference
+customer_name
+amount
+description
+webirr_payment_code
+webirr_payment_status
+webirr_payment_reference
+webirr_paid_via
+created_at
+updated_at
+paid_at
+reversed_at
+```
+
+`merchant_reference` is the durable merchant-side key. Booking IDs, cart item
+details, course IDs, shipping data, and other platform-specific fields should
+stay in the merchant application's own tables.
 
 Run it in mock mode:
 
 ```bash
-go run ./examples/nethttp-memory
+cd examples/nethttp-sqlite
+go run .
 ```
 
 Mock mode requires no WeBirr credentials and is useful for UI checks, local
@@ -348,7 +362,7 @@ Run it against WeBirr TestEnv:
 WEBIRR_MERCHANT_ID=your-test-merchant-id \
 WEBIRR_API_KEY=your-test-api-key \
 WEBIRR_TEST_MODE=true \
-go run ./examples/nethttp-memory
+go run .
 ```
 
 Then open `http://localhost:8080`.
@@ -364,7 +378,7 @@ Run it against WeBirr ProdEnv only from a merchant production deployment:
 WEBIRR_MERCHANT_ID=your-production-merchant-id \
 WEBIRR_API_KEY=your-production-api-key \
 WEBIRR_TEST_MODE=false \
-go run ./examples/nethttp-memory
+go run .
 ```
 
 ## Run Tests

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Order Review</title>
+  <link rel="stylesheet" href="/static/checkout.css">
+</head>
+<body>
+  <main>
+    <section class="shell">
+      <header class="header">
+        <img src="/assets/webirr-icon.png" alt="">
+        <h1>Order Review</h1>
+      </header>
+      <div class="content">
+        <div class="summary">
+          <div>Customer</div><div>{{.CustomerName}}</div>
+          <div>Amount</div><div>{{.Currency}} {{.Amount}}</div>
+          <div>Description</div><div>{{.Description}}</div>
+          <div>Merchant reference</div><div>{{.MerchantReference}}</div>
+        </div>
+        <div class="actions">
+          <a class="button primary" href="{{.CheckoutURL}}">Pay with WeBirr</a>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

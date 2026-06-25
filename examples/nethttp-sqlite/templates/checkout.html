@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>WeBirr Go Checkout Example</title>
+  <link rel="stylesheet" href="/static/checkout.css">
+</head>
+<body>
+  <main>
+    <section class="shell">
+      <header class="header">
+        <img src="/assets/webirr-icon.png" alt="">
+        <div>
+          <h1>WeBirr Online Checkout</h1>
+          <div class="mode">Order payment</div>
+        </div>
+      </header>
+      <div class="content">
+        <section id="review">
+          <div class="summary">
+            <div>Customer</div><div>{{.CustomerName}}</div>
+            <div>Amount</div><div>{{.Currency}} {{.Amount}}</div>
+            <div>Description</div><div>{{.Description}}</div>
+            <div>Merchant reference</div><div>{{.MerchantReference}}</div>
+          </div>
+          <div class="actions">
+            <button class="button primary" id="checkout">Checkout</button>
+            <a class="button secondary" href="{{.OrderURL}}">Cancel</a>
+          </div>
+        </section>
+
+        <section id="waiting" class="hidden">
+          <div class="payment-code-title">WeBirr Payment Code</div>
+          <div class="payment-code" id="payment-code"></div>
+          <div class="status-line" id="status-line"><span class="spinner"></span><span id="status-text">Payment not received yet.</span></div>
+          <dl class="record">
+            <dt>Customer</dt><dd id="waiting-customer"></dd>
+            <dt>Amount</dt><dd id="waiting-amount"></dd>
+            <dt>Merchant reference</dt><dd id="waiting-reference"></dd>
+            <dt>Payment Status</dt><dd id="waiting-status">pending</dd>
+          </dl>
+          <div class="actions refresh-row">
+            <button class="button secondary hidden" id="refresh" type="button">Refresh</button>
+          </div>
+          <div class="instructions">
+            <h2>Payment Instruction</h2>
+            <ul id="instructions"></ul>
+          </div>
+        </section>
+
+        <section id="paid" class="hidden">
+          <div class="confirmed">
+            <div class="check">OK</div>
+            <h2>Payment Confirmed</h2>
+            <dl class="record">
+              <dt>Customer</dt><dd id="paid-customer"></dd>
+              <dt>Amount</dt><dd id="paid-amount"></dd>
+              <dt>Payment Reference</dt><dd id="paid-reference"></dd>
+              <dt>Paid Via</dt><dd id="paid-via"></dd>
+            </dl>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
+  <script>
+    window.webirrCheckout = { merchantReference: "{{.MerchantReference}}" };
+  </script>
+  <script src="/static/checkout.js"></script>
+</body>
+</html>

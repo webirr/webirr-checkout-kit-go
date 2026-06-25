@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Payment Complete</title>
+  <link rel="stylesheet" href="/static/checkout.css">
+</head>
+<body>
+  <main>
+    <section class="shell">
+      <div class="content">
+        <div class="confirmed">
+          <div class="check">OK</div>
+          <h1>Payment Complete</h1>
+          <dl class="record">
+            <dt>Customer</dt><dd>{{.CustomerName}}</dd>
+            <dt>Amount</dt><dd>{{.Currency}} {{.Amount}}</dd>
+            <dt>Description</dt><dd>{{.Description}}</dd>
+            <dt>Merchant reference</dt><dd>{{.MerchantReference}}</dd>
+          </dl>
+        </div>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

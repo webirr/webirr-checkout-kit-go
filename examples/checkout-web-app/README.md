@@ -1,5 +1,7 @@
 # WeBirr Checkout Web App Example
 
+![WeBirr Go checkout flow](screenshots/go-checkout-journey.png)
+
 This is a runnable Go web app that demonstrates the merchant-owned WeBirr online
 checkout pattern.
 
@@ -70,6 +72,42 @@ then reviews that order and starts the standard WeBirr checkout flow.
 The browser sends only the selected book ID and customer name when creating the
 local demo order. Amount, currency, and description are resolved from the server
 catalog.
+
+The visible flow is:
+
+```text
+Catalog -> Order Review -> WeBirr Payment Code -> Payment Confirmed -> Receipt
+```
+
+## Screenshots
+
+### Audio Book Catalog
+
+The customer starts from the audio book catalog, enters a customer name, and
+chooses a book with **Buy**.
+
+![Audio book catalog](screenshots/go-checkout-00-catalog.png)
+
+### Order Review
+
+The order review page shows the merchant-owned payable before WeBirr checkout
+starts.
+
+![Order review](screenshots/go-checkout-01-review.png)
+
+### Payment Code Display
+
+The checkout page displays the **WeBirr Payment Code**, supported payment
+instructions, merchant reference, and pending status.
+
+![Payment code display](screenshots/go-checkout-02-payment-code.png)
+
+### Payment Confirmation
+
+After server-side payment verification, the page shows the payment reference,
+paid-via value, and receipt download link.
+
+![Payment confirmation](screenshots/go-checkout-03-confirmed.png)
 
 ## Endpoints
 

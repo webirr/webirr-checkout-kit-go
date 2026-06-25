@@ -308,18 +308,21 @@ be loaded.
 
 ## Example App
 
-`examples/checkout-web-app` is a runnable Go merchant checkout example. It models
-a small merchant app with an order page, checkout page, merchant-owned WeBirr
-endpoints, a success URL, and a SQLite store that survives retries and process
-restarts.
+`examples/checkout-web-app` is a runnable Go merchant checkout example. It
+models a small audio book store with a catalog page, order review page, checkout
+page, merchant-owned WeBirr endpoints, a success URL, receipt download, and a
+SQLite store that survives retries and process restarts.
 
 | Route | Purpose |
 | --- | --- |
+| `/` | Audio book catalog with customer input and Buy buttons. |
+| `/demo/orders` | Creates a local SQLite order from the selected book and customer name. |
 | `/orders/{merchantReference}` | Merchant order review page. |
 | `/checkout?merchantReference=...` | Browser checkout page that displays the WeBirr Payment Code. |
 | `/webirr/checkout` | Merchant-owned create/resume endpoint backed by the kit. |
 | `/webirr/checkout/status?merchantReference=...` | Merchant-owned status endpoint backed by the kit. |
 | `/orders/{merchantReference}/success` | Merchant success URL after local payment completion. |
+| `/orders/{merchantReference}/receipt.txt` | Downloads the demo receipt after payment is confirmed. |
 
 The example uses SQLite as the standard local example store. The table keeps the
 checkout-specific state separate from the merchant's full business data:
@@ -327,8 +330,12 @@ checkout-specific state separate from the merchant's full business data:
 ```text
 id
 merchant_reference
+demo_type
+item_id
+item_title
 customer_name
 amount
+currency
 description
 webirr_payment_code
 webirr_payment_status
@@ -343,6 +350,12 @@ reversed_at
 `merchant_reference` is the durable merchant-side key. Booking IDs, cart item
 details, course IDs, shipping data, and other platform-specific fields should
 stay in the merchant application's own tables.
+
+The example README includes the full customer-facing screenshot set:
+
+```text
+Catalog -> Order Review -> WeBirr Payment Code -> Payment Confirmed
+```
 
 Run it in mock mode:
 

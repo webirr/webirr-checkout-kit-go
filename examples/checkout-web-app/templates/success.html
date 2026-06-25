@@ -15,10 +15,12 @@
           <h1>Payment Complete</h1>
           <dl class="record">
             <dt>Customer</dt><dd>{{.CustomerName}}</dd>
+            <dt>Audio book</dt><dd>{{.ItemTitle}}</dd>
             <dt>Amount</dt><dd>{{.Currency}} {{.Amount}}</dd>
-            <dt>Description</dt><dd>{{.Description}}</dd>
-            <dt>Merchant reference</dt><dd>{{.MerchantReference}}</dd>
+            <dt>Payment Reference</dt><dd>{{.PaymentReference}}</dd>
+            <dt>Paid Via</dt><dd>{{.PaidVia}}</dd>
           </dl>
+          <a class="button primary" href="{{.ReceiptURL}}">Download receipt</a>
         </div>
       </div>
     </section>

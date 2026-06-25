@@ -5,10 +5,12 @@ checkout pattern.
 
 The app shows:
 
-- an order review page;
+- a 10-item audio book catalog;
+- a local order review page;
 - a checkout page that displays the WeBirr Payment Code;
 - merchant-owned create and status endpoints;
 - SQLite-backed retry and recovery state;
+- a `.txt` digital audio book receipt after paid confirmation;
 - mock mode for local UI checks;
 - optional WeBirr TestEnv or ProdEnv mode.
 
@@ -58,17 +60,16 @@ WEBIRR_TEST_MODE=false \
 go run .
 ```
 
-## Demo Values
+## Demo Flow
 
-Optional local demo values:
+The home page shows a small audio book store. Customer name defaults to `Elias`
+and cannot be empty. When the customer clicks `Buy`, the server creates a local
+SQLite order with a generated `ord_{shortuuid}` merchant reference. The browser
+then reviews that order and starts the standard WeBirr checkout flow.
 
-```bash
-WEBIRR_DEMO_MERCHANT_REFERENCE=ord_2026_06_24_10033
-WEBIRR_DEMO_AMOUNT=640.00
-WEBIRR_DEMO_DESCRIPTION="Sample Audio Book"
-WEBIRR_DEMO_CUSTOMER_NAME=Elias
-WEBIRR_DEMO_SQLITE_PATH=webirr-checkout-demo.sqlite3
-```
+The browser sends only the selected book ID and customer name when creating the
+local demo order. Amount, currency, and description are resolved from the server
+catalog.
 
 ## Endpoints
 
@@ -76,11 +77,14 @@ The browser calls only the merchant backend:
 
 | Route | Purpose |
 | --- | --- |
+| `GET /` | Audio book catalog. |
+| `POST /demo/orders` | Create a local demo order for the selected book. |
 | `GET /orders/{merchantReference}` | Order review page. |
 | `GET /checkout?merchantReference=...` | Checkout page. |
 | `POST /webirr/checkout` | Create or resume the WeBirr payment code. |
 | `GET /webirr/checkout/status?merchantReference=...` | Poll status and complete the local payable when paid. |
 | `GET /orders/{merchantReference}/success` | Merchant success page. |
+| `GET /orders/{merchantReference}/receipt.txt` | Download the demo receipt after payment is confirmed. |
 
 Create request:
 
@@ -98,8 +102,12 @@ The example stores checkout/payment state in SQLite:
 ```text
 id
 merchant_reference
+demo_type
+item_id
+item_title
 customer_name
 amount
+currency
 description
 webirr_payment_code
 webirr_payment_status

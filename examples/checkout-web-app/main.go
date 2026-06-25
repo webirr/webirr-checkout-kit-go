@@ -1,8 +1,11 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -32,11 +35,6 @@ func main() {
 	}
 	defer store.Close()
 
-	order := defaultOrder()
-	if err := store.UpsertOrder(order); err != nil {
-		log.Fatal(err)
-	}
-
 	pages, err := parseTemplates(baseDir)
 	if err != nil {
 		log.Fatal(err)
@@ -52,20 +50,65 @@ func main() {
 			http.NotFound(w, r)
 			return
 		}
-		http.Redirect(w, r, order.OrderURL(), http.StatusFound)
+		renderCatalog(w, pages, catalogPage{CustomerName: "Elias", Books: demoCatalog()})
+	})
+	mux.HandleFunc("/demo/orders", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		customerName := strings.TrimSpace(r.Form.Get("customerName"))
+		book, ok := findBook(strings.TrimSpace(r.Form.Get("bookID")))
+		if customerName == "" || !ok {
+			message := "Choose a book and enter customer name."
+			if customerName == "" {
+				message = "Customer name is required."
+			}
+			renderCatalog(w, pages, catalogPage{CustomerName: firstNonEmpty(customerName, "Elias"), Books: demoCatalog(), Error: message})
+			return
+		}
+		order := orderFromBook(book, customerName, newMerchantReference())
+		if err := store.UpsertOrder(order); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, order.OrderURL(), http.StatusSeeOther)
 	})
 	mux.HandleFunc("/orders/", func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case order.OrderURL():
-			render(w, pages, "order.html", order)
-		case order.SuccessURL():
-			render(w, pages, "success.html", order)
+		merchantReference := strings.TrimPrefix(r.URL.Path, "/orders/")
+		switch {
+		case strings.HasSuffix(merchantReference, "/success"):
+			merchantReference = strings.TrimSuffix(merchantReference, "/success")
+			receipt, err := store.LoadReceipt(r.Context(), merchantReference)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			render(w, pages, "success.html", receipt)
+		case strings.HasSuffix(merchantReference, "/receipt.txt"):
+			merchantReference = strings.TrimSuffix(merchantReference, "/receipt.txt")
+			receipt, err := store.LoadReceipt(r.Context(), merchantReference)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			serveReceipt(w, receipt)
 		default:
-			http.NotFound(w, r)
+			order, err := store.LoadOrder(r.Context(), merchantReference)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			render(w, pages, "order.html", order)
 		}
 	})
 	mux.HandleFunc("/checkout", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("merchantReference") != order.MerchantReference {
+		order, err := store.LoadOrder(r.Context(), r.URL.Query().Get("merchantReference"))
+		if err != nil {
 			http.NotFound(w, r)
 			return
 		}
@@ -113,27 +156,8 @@ func envBoolDefault(name string, defaultValue bool) (bool, error) {
 	}
 }
 
-func defaultOrder() demoOrder {
-	merchantReference := strings.TrimSpace(os.Getenv("WEBIRR_DEMO_MERCHANT_REFERENCE"))
-	if merchantReference == "" {
-		merchantReference = "ord_" + time.Now().Format("2006_01_02_150405")
-	}
-	amount := firstNonEmpty(os.Getenv("WEBIRR_DEMO_AMOUNT"), "640.00")
-	description := firstNonEmpty(os.Getenv("WEBIRR_DEMO_DESCRIPTION"), "Sample Audio Book")
-	customerName := firstNonEmpty(os.Getenv("WEBIRR_DEMO_CUSTOMER_NAME"), "Elias")
-	return demoOrder{
-		MerchantReference: merchantReference,
-		Amount:            amount,
-		Currency:          "ETB",
-		CustomerName:      customerName,
-		CustomerCode:      "CUST-1001",
-		CustomerPhone:     "",
-		Description:       description,
-	}
-}
-
 func sqlitePath() string {
-	return firstNonEmpty(os.Getenv("WEBIRR_DEMO_SQLITE_PATH"), "webirr-checkout-demo.sqlite3")
+	return "webirr-checkout-demo.sqlite3"
 }
 
 func exampleDir() (string, error) {
@@ -149,14 +173,52 @@ func parseTemplates(baseDir string) (*template.Template, error) {
 		filepath.Join(baseDir, "templates", "order.html"),
 		filepath.Join(baseDir, "templates", "checkout.html"),
 		filepath.Join(baseDir, "templates", "success.html"),
+		filepath.Join(baseDir, "templates", "catalog.html"),
 	)
 }
 
-func render(w http.ResponseWriter, pages *template.Template, name string, order demoOrder) {
+func render(w http.ResponseWriter, pages *template.Template, name string, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := pages.ExecuteTemplate(w, name, order); err != nil {
+	if err := pages.ExecuteTemplate(w, name, data); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
+}
+
+func renderCatalog(w http.ResponseWriter, pages *template.Template, page catalogPage) {
+	render(w, pages, "catalog.html", page)
+}
+
+func newMerchantReference() string {
+	var bytes [4]byte
+	if _, err := rand.Read(bytes[:]); err != nil {
+		return "ord_" + time.Now().UTC().Format("20060102150405")
+	}
+	return "ord_" + hex.EncodeToString(bytes[:])
+}
+
+func serveReceipt(w http.ResponseWriter, receipt receiptData) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+receipt.MerchantReference+`-receipt.txt"`)
+	_, _ = io.WriteString(w, receiptText(receipt))
+}
+
+func receiptText(receipt receiptData) string {
+	return strings.Join([]string{
+		"WeBirr Online Checkout Demo",
+		"----------------------------",
+		"Digital Audio Book Purchase Receipt",
+		"",
+		"Customer Name: " + receipt.CustomerName,
+		"Audio Book Title: " + receipt.ItemTitle,
+		"Amount: " + receipt.Amount + " " + receipt.Currency,
+		"Merchant Reference: " + receipt.MerchantReference,
+		"WeBirr Payment Code: " + receipt.PaymentCode,
+		"Payment Reference: " + receipt.PaymentReference,
+		"Paid Via: " + receipt.PaidVia,
+		"Paid At: " + receipt.PaidAt,
+		"Demo Download Access: " + receipt.ItemTitle,
+		"",
+	}, "\n")
 }
 
 func firstNonEmpty(values ...string) string {

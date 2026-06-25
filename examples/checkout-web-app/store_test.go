@@ -16,8 +16,11 @@ func TestSQLiteStorePersistsPaymentCodeAndRecoversAfterReopen(t *testing.T) {
 	}
 	order := demoOrder{
 		MerchantReference: "ord_2026_06_24_10033",
+		ItemID:            "audio-book-001",
+		ItemTitle:         "Modern Business Audio Book",
 		CustomerName:      "Elias",
 		Amount:            "640.00",
+		Currency:          "ETB",
 		Description:       "Sample Audio Book",
 	}
 	if err := store.UpsertOrder(order); err != nil {
@@ -55,7 +58,7 @@ func TestSQLiteStoreUpdatesDetailsWithoutClearingPaymentCode(t *testing.T) {
 	}
 	defer store.Close()
 
-	order := demoOrder{MerchantReference: "ord_update", CustomerName: "Elias", Amount: "640.00", Description: "Sample Audio Book"}
+	order := demoOrder{MerchantReference: "ord_update", ItemID: "audio-book-001", ItemTitle: "Modern Business Audio Book", CustomerName: "Elias", Amount: "640.00", Currency: "ETB", Description: "Sample Audio Book"}
 	if err := store.UpsertOrder(order); err != nil {
 		t.Fatalf("UpsertOrder returned error: %v", err)
 	}
@@ -63,7 +66,8 @@ func TestSQLiteStoreUpdatesDetailsWithoutClearingPaymentCode(t *testing.T) {
 		t.Fatalf("SavePaymentCode returned error: %v", err)
 	}
 	order.Amount = "645.00"
-	order.Description = "Updated Audio Book"
+	order.ItemTitle = "Updated Audio Book"
+	order.Description = "Digital audio book purchase"
 	if err := store.UpsertOrder(order); err != nil {
 		t.Fatalf("second UpsertOrder returned error: %v", err)
 	}
@@ -72,7 +76,7 @@ func TestSQLiteStoreUpdatesDetailsWithoutClearingPaymentCode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadPayable returned error: %v", err)
 	}
-	if payable.Amount != "645.00" || payable.Description != "Updated Audio Book" {
+	if payable.Amount != "645.00" || payable.Description != "Updated Audio Book - Digital audio book purchase" {
 		t.Fatalf("payable details = %#v", payable)
 	}
 	if payable.WebirrPaymentCode != "451 728 230" {
@@ -87,7 +91,7 @@ func TestSQLiteStoreMarksPaidAndReversed(t *testing.T) {
 	}
 	defer store.Close()
 
-	order := demoOrder{MerchantReference: "ord_paid", CustomerName: "Elias", Amount: "640.00", Description: "Sample Audio Book"}
+	order := demoOrder{MerchantReference: "ord_paid", ItemID: "audio-book-001", ItemTitle: "Modern Business Audio Book", CustomerName: "Elias", Amount: "640.00", Currency: "ETB", Description: "Digital audio book purchase"}
 	if err := store.UpsertOrder(order); err != nil {
 		t.Fatalf("UpsertOrder returned error: %v", err)
 	}
@@ -107,6 +111,13 @@ func TestSQLiteStoreMarksPaidAndReversed(t *testing.T) {
 	}
 	if status.Status != checkout.StatusPaid || status.PaymentReference != "TX123" || status.PaymentIssuer != "CBE Mobile" {
 		t.Fatalf("paid status = %#v", status)
+	}
+	receipt, err := store.LoadReceipt(context.Background(), order.MerchantReference)
+	if err != nil {
+		t.Fatalf("LoadReceipt returned error: %v", err)
+	}
+	if receipt.ItemTitle != "Modern Business Audio Book" || receipt.PaymentReference != "TX123" {
+		t.Fatalf("receipt = %#v", receipt)
 	}
 
 	if err := store.MarkReversed(order.MerchantReference); err != nil {

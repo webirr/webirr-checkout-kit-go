@@ -20,6 +20,7 @@
         <section id="review">
           <div class="summary">
             <div>Customer</div><div>{{.CustomerName}}</div>
+            <div>Audio book</div><div>{{.ItemTitle}}</div>
             <div>Amount</div><div>{{.Currency}} {{.Amount}}</div>
             <div>Description</div><div>{{.Description}}</div>
             <div>Merchant reference</div><div>{{.MerchantReference}}</div>
@@ -59,13 +60,17 @@
               <dt>Payment Reference</dt><dd id="paid-reference"></dd>
               <dt>Paid Via</dt><dd id="paid-via"></dd>
             </dl>
+            <a class="button primary" id="receipt-link" href="{{.ReceiptURL}}">Download receipt</a>
           </div>
         </section>
       </div>
     </section>
   </main>
   <script>
-    window.webirrCheckout = { merchantReference: "{{.MerchantReference}}" };
+    window.webirrCheckout = {
+      merchantReference: "{{.MerchantReference}}",
+      receiptUrl: "{{.ReceiptURL}}"
+    };
   </script>
   <script src="/static/checkout.js"></script>
 </body>

@@ -1,5 +1,6 @@
 (function () {
   const merchantReference = window.webirrCheckout.merchantReference;
+  const receiptUrl = window.webirrCheckout.receiptUrl;
   const review = document.getElementById("review");
   const waiting = document.getElementById("waiting");
   const paid = document.getElementById("paid");
@@ -52,6 +53,7 @@
     document.getElementById("paid-amount").textContent = money(status.amount || checkoutData.amount, status.currency || checkoutData.currency);
     document.getElementById("paid-reference").textContent = status.paymentReference || "";
     document.getElementById("paid-via").textContent = status.paymentIssuer || "";
+    document.getElementById("receipt-link").href = status.receiptUrl || receiptUrl;
     show("paid");
   }
 

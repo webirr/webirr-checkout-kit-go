@@ -62,6 +62,58 @@ h1 {
   padding: 24px 26px 28px;
 }
 
+.catalog-form {
+  display: grid;
+  gap: 18px;
+}
+
+.catalog-form label {
+  font-weight: 700;
+}
+
+.catalog-form input {
+  width: min(420px, 100%);
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 9px 12px;
+  font: inherit;
+}
+
+.catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.book-card {
+  display: grid;
+  gap: 16px;
+  align-content: space-between;
+  min-height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 16px;
+  background: #fff;
+}
+
+.book-card h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.book-card p {
+  color: var(--muted);
+  margin: 0 0 12px;
+}
+
+.error {
+  border: 1px solid #efb4b4;
+  background: #fff1f1;
+  border-radius: 6px;
+  padding: 11px 13px;
+}
+
 .summary,
 .record {
   display: grid;
@@ -200,6 +252,12 @@ h1 {
   border-radius: 7px;
   padding: 22px;
   max-width: 680px;
+}
+
+.confirmed .button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .check {

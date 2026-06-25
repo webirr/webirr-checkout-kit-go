@@ -37,8 +37,12 @@ func (s *SQLiteStore) migrate() error {
 CREATE TABLE IF NOT EXISTS webirr_checkouts (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   merchant_reference TEXT NOT NULL UNIQUE,
+  demo_type TEXT NOT NULL DEFAULT 'audiobook',
+  item_id TEXT NOT NULL DEFAULT '',
+  item_title TEXT NOT NULL DEFAULT '',
   customer_name TEXT NOT NULL,
   amount TEXT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'ETB',
   description TEXT NOT NULL,
   webirr_payment_code TEXT NOT NULL DEFAULT '',
   webirr_payment_status INTEGER NOT NULL DEFAULT 0,
@@ -51,42 +55,83 @@ CREATE TABLE IF NOT EXISTS webirr_checkouts (
 );
 CREATE INDEX IF NOT EXISTS idx_webirr_checkouts_status ON webirr_checkouts(webirr_payment_status);
 `)
-	return err
+	if err != nil {
+		return err
+	}
+	for _, column := range []struct {
+		name       string
+		definition string
+	}{
+		{"demo_type", "TEXT NOT NULL DEFAULT 'audiobook'"},
+		{"item_id", "TEXT NOT NULL DEFAULT ''"},
+		{"item_title", "TEXT NOT NULL DEFAULT ''"},
+		{"currency", "TEXT NOT NULL DEFAULT 'ETB'"},
+	} {
+		if err := s.ensureColumn(column.name, column.definition); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *SQLiteStore) UpsertOrder(order demoOrder) error {
 	now := nowText()
 	_, err := s.db.Exec(`
 INSERT INTO webirr_checkouts (
-  merchant_reference, customer_name, amount, description, created_at, updated_at
-) VALUES (?, ?, ?, ?, ?, ?)
+  merchant_reference, demo_type, item_id, item_title, customer_name, amount,
+  currency, description, created_at, updated_at
+) VALUES (?, 'audiobook', ?, ?, ?, ?, ?, ?, ?, ?)
 ON CONFLICT(merchant_reference) DO UPDATE SET
+  item_id = excluded.item_id,
+  item_title = excluded.item_title,
   customer_name = excluded.customer_name,
   amount = excluded.amount,
+  currency = excluded.currency,
   description = excluded.description,
   updated_at = excluded.updated_at
-`, order.MerchantReference, order.CustomerName, order.Amount, order.Description, now, now)
+`, order.MerchantReference, order.ItemID, order.ItemTitle, order.CustomerName, order.Amount, order.Currency, order.Description, now, now)
 	return err
+}
+
+func (s *SQLiteStore) LoadOrder(_ context.Context, merchantReference string) (demoOrder, error) {
+	row := s.db.QueryRow(`
+SELECT merchant_reference, item_id, item_title, customer_name, amount, currency, description
+FROM webirr_checkouts
+WHERE merchant_reference = ?
+`, merchantReference)
+
+	var order demoOrder
+	if err := row.Scan(&order.MerchantReference, &order.ItemID, &order.ItemTitle, &order.CustomerName, &order.Amount, &order.Currency, &order.Description); err != nil {
+		if err == sql.ErrNoRows {
+			return demoOrder{}, fmt.Errorf("order %q was not found", merchantReference)
+		}
+		return demoOrder{}, err
+	}
+	order.CustomerCode = order.MerchantReference
+	return order, nil
 }
 
 func (s *SQLiteStore) LoadPayable(_ context.Context, merchantReference string) (checkout.Payable, error) {
 	row := s.db.QueryRow(`
-SELECT merchant_reference, customer_name, amount, description, webirr_payment_code, webirr_payment_status
+SELECT merchant_reference, item_title, customer_name, amount, currency, description, webirr_payment_code, webirr_payment_status
 FROM webirr_checkouts
 WHERE merchant_reference = ?
 `, merchantReference)
 
 	var payable checkout.Payable
+	var itemTitle string
 	var paymentCode string
 	var paymentStatus int
-	if err := row.Scan(&payable.MerchantReference, &payable.CustomerName, &payable.Amount, &payable.Description, &paymentCode, &paymentStatus); err != nil {
+	if err := row.Scan(&payable.MerchantReference, &itemTitle, &payable.CustomerName, &payable.Amount, &payable.Currency, &payable.Description, &paymentCode, &paymentStatus); err != nil {
 		if err == sql.ErrNoRows {
 			return checkout.Payable{}, fmt.Errorf("payable %q was not found", merchantReference)
 		}
 		return checkout.Payable{}, err
 	}
-	payable.Currency = "ETB"
 	payable.CustomerCode = merchantReference
+	if itemTitle != "" {
+		payable.Description = itemTitle + " - " + payable.Description
+	}
 	payable.WebirrPaymentCode = paymentCode
 	payable.PaymentStatus = &paymentStatus
 	payable.SuccessURL = "/orders/" + merchantReference + "/success"
@@ -179,6 +224,67 @@ WHERE merchant_reference = ?
 		status.PaidAt = paidAt.String
 	}
 	return status, nil
+}
+
+func (s *SQLiteStore) LoadReceipt(_ context.Context, merchantReference string) (receiptData, error) {
+	row := s.db.QueryRow(`
+SELECT merchant_reference, item_id, item_title, customer_name, amount, currency, description,
+       webirr_payment_code, webirr_payment_reference, webirr_paid_via, paid_at
+FROM webirr_checkouts
+WHERE merchant_reference = ? AND webirr_payment_status = 2
+`, merchantReference)
+
+	var receipt receiptData
+	var paidAt sql.NullString
+	if err := row.Scan(
+		&receipt.MerchantReference,
+		&receipt.ItemID,
+		&receipt.ItemTitle,
+		&receipt.CustomerName,
+		&receipt.Amount,
+		&receipt.Currency,
+		&receipt.Description,
+		&receipt.PaymentCode,
+		&receipt.PaymentReference,
+		&receipt.PaidVia,
+		&paidAt,
+	); err != nil {
+		if err == sql.ErrNoRows {
+			return receiptData{}, fmt.Errorf("paid order %q was not found", merchantReference)
+		}
+		return receiptData{}, err
+	}
+	receipt.CustomerCode = receipt.MerchantReference
+	if paidAt.Valid {
+		receipt.PaidAt = paidAt.String
+	}
+	return receipt, nil
+}
+
+func (s *SQLiteStore) ensureColumn(name, definition string) error {
+	rows, err := s.db.Query(`PRAGMA table_info(webirr_checkouts)`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var columnName, columnType string
+		var notNull int
+		var defaultValue any
+		var pk int
+		if err := rows.Scan(&cid, &columnName, &columnType, &notNull, &defaultValue, &pk); err != nil {
+			return err
+		}
+		if columnName == name {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`ALTER TABLE webirr_checkouts ADD COLUMN ` + name + ` ` + definition)
+	return err
 }
 
 func requireUpdated(result sql.Result, merchantReference string) error {

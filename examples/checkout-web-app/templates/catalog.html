@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Audio Book Store</title>
+  <link rel="stylesheet" href="/static/checkout.css">
+</head>
+<body>
+  <main>
+    <section class="shell">
+      <header class="header">
+        <img src="/assets/webirr-icon.png" alt="">
+        <div>
+          <h1>Audio Book Store</h1>
+          <div class="mode">WeBirr online checkout demo</div>
+        </div>
+      </header>
+      <div class="content">
+        {{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+        <form method="post" action="/demo/orders" class="catalog-form">
+          <label for="customerName">Customer</label>
+          <input id="customerName" name="customerName" required value="{{.CustomerName}}" autocomplete="name">
+          <div class="catalog-grid">
+            {{range .Books}}
+            <article class="book-card">
+              <div>
+                <h2>{{.Title}}</h2>
+                <p>{{.Description}}</p>
+                <strong>{{.Currency}} {{.Amount}}</strong>
+              </div>
+              <button class="button primary" name="bookID" value="{{.ID}}" type="submit">Buy</button>
+            </article>
+            {{end}}
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+  <script>
+    document.querySelector(".catalog-form").addEventListener("submit", function (event) {
+      if (!document.getElementById("customerName").value.trim()) {
+        event.preventDefault();
+        document.getElementById("customerName").focus();
+      }
+    });
+  </script>
+</body>
+</html>

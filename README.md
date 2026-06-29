@@ -408,9 +408,3 @@ If Go is not installed locally, use Docker:
 docker run --rm -v "$PWD":/src -w /src golang:1.22 \
   sh -lc "/usr/local/go/bin/gofmt -w . && /usr/local/go/bin/go test ./..."
 ```
-
-## Release Status
-
-This package is not released publicly yet. Before the first release, create the
-GitHub repository, register it as a hub submodule, run package validation, tag a
-reviewed version, and create a matching GitHub Release.

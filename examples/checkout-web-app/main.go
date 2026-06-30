@@ -157,15 +157,32 @@ func envBoolDefault(name string, defaultValue bool) (bool, error) {
 }
 
 func sqlitePath() string {
+	if info, err := os.Stat("/data"); err == nil && info.IsDir() {
+		return filepath.Join("/data", "webirr-checkout-demo.sqlite3")
+	}
 	return "webirr-checkout-demo.sqlite3"
 }
 
 func exampleDir() (string, error) {
+	if dir, err := os.Getwd(); err == nil && hasExampleTemplates(dir) {
+		return dir, nil
+	}
+	if exe, err := os.Executable(); err == nil {
+		dir := filepath.Dir(exe)
+		if hasExampleTemplates(dir) {
+			return dir, nil
+		}
+	}
 	_, file, _, ok := runtime.Caller(0)
 	if !ok {
 		return "", errors.New("could not resolve example directory")
 	}
 	return filepath.Dir(file), nil
+}
+
+func hasExampleTemplates(dir string) bool {
+	info, err := os.Stat(filepath.Join(dir, "templates", "catalog.html"))
+	return err == nil && !info.IsDir()
 }
 
 func parseTemplates(baseDir string) (*template.Template, error) {

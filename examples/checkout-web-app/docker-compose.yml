@@ -1,0 +1,17 @@
+services:
+  web:
+    build:
+      context: ../..
+      dockerfile: examples/checkout-web-app/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      WEBIRR_MERCHANT_ID: ${WEBIRR_MERCHANT_ID:-}
+      WEBIRR_API_KEY: ${WEBIRR_API_KEY:-}
+      WEBIRR_TEST_MODE: ${WEBIRR_TEST_MODE:-true}
+    volumes:
+      - webirr_checkout_data:/data
+    restart: unless-stopped
+
+volumes:
+  webirr_checkout_data:

@@ -34,6 +34,24 @@ http://localhost:8080
 The example creates a local SQLite database named
 `webirr-checkout-demo.sqlite3`. It is ignored by Git.
 
+## Docker Compose / Dokploy
+
+For VPS deployment through Dokploy, use the Compose file in this example
+directory. Compose is the deployment entrypoint and builds the example image from
+the local Dockerfile:
+
+```bash
+WEBIRR_MERCHANT_ID=your-test-merchant-id \
+WEBIRR_API_KEY=your-test-api-key \
+WEBIRR_TEST_MODE=true \
+docker compose up --build
+```
+
+The app will be available at `http://localhost:8080`. Compose passes only the
+three WeBirr gateway variables and stores SQLite state in the
+`webirr_checkout_data` volume mounted at `/data`, so payment-code retry/recovery
+state survives container restarts.
+
 ## TestEnv Mode
 
 Keep merchant credentials on the server side:

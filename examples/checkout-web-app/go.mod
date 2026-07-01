@@ -3,7 +3,7 @@ module github.com/webirr/webirr-checkout-kit-go/examples/checkout-web-app
 go 1.22
 
 require (
-	github.com/webirr/webirr-api-go-client v1.0.0
+	github.com/webirr/webirr-api-go-client v1.1.1
 	github.com/webirr/webirr-checkout-kit-go v0.0.0
 	modernc.org/sqlite v1.36.1
 )

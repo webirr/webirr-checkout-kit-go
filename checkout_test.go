@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	webirr "github.com/webirr/webirr-api-go-client"
@@ -96,6 +98,34 @@ func TestCreateCheckoutUpdatesExistingUnpaidBillWhenPayableChanges(t *testing.T)
 	}
 	if gateway.updateCalls != 1 {
 		t.Fatalf("updateCalls = %d, want 1", gateway.updateCalls)
+	}
+}
+
+func TestCreateCheckoutPropagatesPlatformErrors(t *testing.T) {
+	store := NewMemoryStore()
+	store.PutPayable(testPayable("ord_platform_error"))
+	expected := errors.New("connection reset")
+	gateway := &fakeGateway{createErr: expected}
+
+	_, err := New(gateway, store).CreateCheckout(context.Background(), "ord_platform_error")
+	if !errors.Is(err, expected) {
+		t.Fatalf("CreateCheckout error = %v, want %v", err, expected)
+	}
+}
+
+func TestCreateCheckoutKeepsBusinessErrorsInApiResponsePath(t *testing.T) {
+	store := NewMemoryStore()
+	store.PutPayable(testPayable("ord_business_error"))
+	gateway := &fakeGateway{
+		createResponse: &webirr.ApiResponse[string]{
+			Error:     "invalid amount",
+			ErrorCode: "INVALID_AMOUNT",
+		},
+	}
+
+	_, err := New(gateway, store).CreateCheckout(context.Background(), "ord_business_error")
+	if err == nil || !strings.Contains(err.Error(), "could not create bill: invalid amount") {
+		t.Fatalf("CreateCheckout error = %v, want create bill business error", err)
 	}
 }
 
@@ -251,6 +281,8 @@ func testPayable(reference string) Payable {
 
 type fakeGateway struct {
 	createCode     string
+	createResponse *webirr.ApiResponse[string]
+	createErr      error
 	recoveredBill  *webirr.BillResponse
 	billByCode     *webirr.BillResponse
 	paymentStatus  webirr.PaymentStatus
@@ -263,6 +295,12 @@ type fakeGateway struct {
 
 func (g *fakeGateway) CreateBill(_ context.Context, _ *webirr.Bill) (*webirr.ApiResponse[string], error) {
 	g.createCalls++
+	if g.createErr != nil {
+		return nil, g.createErr
+	}
+	if g.createResponse != nil {
+		return g.createResponse, nil
+	}
 	return &webirr.ApiResponse[string]{Res: firstNonEmpty(g.createCode, "100200")}, nil
 }
 
